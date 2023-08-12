@@ -2,14 +2,11 @@ require("dotenv").config({ path: "./my.env" }); // replace with your own .env fi
 const login = require("./login");
 const download = require("./download.js");
 const upload = require("./upload.js");
-
 const email = `${process.env.MEGA_EMAIL}`; // replace with your mega email; my email is stored in my.env file
 const password = `${process.env.MEGA_PASSWORD}`; // replace with your mega password; my password is stored in my.env file
-
 const downloadFolder = `${process.env.DownloadFolderPath}`; // replace with your desired download folder
 const fileName = "rec_n.06_21.wav"; // replace with the file you would like to download from mega
 
-// Newest Working Code
 /**
  * A comprehensive testing function to validate various Mega API operations.
  * This function covers login, file and folder download, file upload, and more.

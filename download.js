@@ -79,7 +79,6 @@ function checkStorageSpace(spaceNeeded, downloadFolder) {
       availableSpace / (1024 * 1024 * 1024), "VS Space Needed: ", spaceNeeded / (1024 * 1024 * 1024)
     );
   }
-
   if (availableSpace < spaceNeeded) {
     // Delete files in the download folder until enough space is available
     const files = fs.readdirSync(downloadFolder);

@@ -1,6 +1,5 @@
 const { Storage } = require("megajs");
 require("dotenv").config({ path: "./my.env" });
-
 const myEmail = `${process.env.MEGA_EMAIL}`;
 const myPassword = `${process.env.MEGA_PASSWORD}`;
 

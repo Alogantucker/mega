@@ -1,6 +1,5 @@
 const path = require('path');
 const { File } = require("megajs");
-
 const MAX_RETRIES = 3;
 
 /**
