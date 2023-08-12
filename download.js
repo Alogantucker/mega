@@ -1,4 +1,3 @@
-const { File } = require("megajs");
 const fs = require("fs").promises;
 const fs2 = require("fs");
 const { execSync } = require("child_process");
@@ -6,8 +5,19 @@ const os = require("os");
 const get = require("./get.js");
 const path = require('path');
 
-// Function to check available storage space and delete files if needed
+// WORKS
+/**
+ * Check available storage space and delete files if needed.
+ * @param {number} spaceNeeded - The space needed in bytes.
+ * @param {string} downloadFolder - The path to the download folder.
+ * @returns {boolean} - Whether enough space is available.
+ */
 function checkStorageSpace(spaceNeeded, downloadFolder) {
+
+  /**
+ * Get available space on the disk.
+ * @returns {number|null} - Available space in bytes or null if retrieval failed.
+ */
   function getAvailableSpace() {
     if (os.platform() === "darwin") {
       // tested and working
@@ -93,13 +103,25 @@ function checkStorageSpace(spaceNeeded, downloadFolder) {
   return availableSpace >= spaceNeeded;
 }
 
-// Function to calculate total space needed for all data in the foundData array
+// WORKS
+/**
+ * Calculate the total space needed for all data in the dataArray.
+ * @param {Array} dataArray - The array of data objects.
+ * @returns {number} - The total space needed in bytes.
+ */
 async function getTotalSpaceNeeded(dataArray) {
 
   return dataArray.reduce(async (total, data) => data?.buffer?.length ? total + data?.buffer?.length : total + data?.length, 0);
 }
 
-// Function to save the data to a file with a unique name
+// WORKS
+/**
+ * Save data to a file with a unique name.
+ * @param {string} filePath - The path to the file.
+ * @param {Buffer} data - The data to be saved.
+ * @param {number} counter - The counter for generating unique names.
+ * @param {string} originalExtension - The original extension of the file.
+ */
 async function saveFileWithUniqueName(
   filePath,
   data,
@@ -125,36 +147,23 @@ async function saveFileWithUniqueName(
       }
 }
 
-// Function to determine the file extension based on the magic number in the data
-async function getFileExtension(data) {
-  const fileTypeModule = await import("file-type");
-  const type = await fileTypeModule.fileTypeFromBuffer(data);
-  // type ex. {ext: 'mp3', mime: 'audio/mpeg'}
-  if (type) {
-    return `.${type.ext}`;
-  } else {
-    return ".dat"; // Default to .dat if the file type is not recognized
-  }
-}
 
-function getFileNameFromContentDisposition(data) {
-  const contentDisposition = data
-    .toString("utf8")
-    .match(/Content-Disposition:.*filename="([^"]+)"/);
-  if (contentDisposition && contentDisposition.length > 1) {
-    return contentDisposition[1];
-  } else {
-    return null;
-  }
-}
-// Tested & Working
+// WORKS
+/**
+ * Find files by name and download them from Mega.
+ *
+ * @param {object} mega - The Mega instance.
+ * @param {string} targetFileName - The target file name to search for.
+ * @param {string} downloadDestination - The local directory to save the downloaded files.
+ * @param {object} rootFolder - The root folder to start the search from.
+ */
 async function fileByName(
   mega,
   targetFileName,
   downloadDestination,
   rootFolder
 ) {
-  // only reload after making changes to the mega not through the code
+  // TODO: Uncomment the following line to reload Mega (if needed).
   // await mega.reload();
 
   try {
@@ -194,101 +203,121 @@ async function fileByName(
   }
 }
 
-// Function to save the data to a file with a unique name
-function saveFolderWithUniqueName(folderPath, data, counter = 0) {
-  const fullFolderPath =
-    counter === 0
-      ? folderPath
-      : `${folderPath.replace(/(\.[^.]+$)/, "")}(${counter})$1`;
-  if (fs.existsSync(fullFolderPath)) {
-    return saveFolderWithUniqueName(folderPath, data, counter + 1);
-  } else {
-    // Save the file with the original extension if it doesn't exist
-    fs.writeFileSync(fullFolderPath, data);
-    console.log(`Download and save successful: ${fullFolderPath}`);
-  }
-}
 
+// WORKS
+/**
+ * Create a unique local folder with a name based on the provided folderName.
+ * If a folder with the same name already exists, increment a suffix number.
+ *
+ * @param {string} destination - The destination directory where the new folder will be created.
+ * @param {string} folderName - The desired name of the folder.
+ * @returns {string} - The path of the newly created local folder.
+ */
 function makeLocalFolder(destination, folderName) {
   let suffix = "";
   let folderNameWithSuffix = folderName;
 
+  // Check if a folder with the same name already exists
   while (fs2.existsSync(`${destination}/${folderNameWithSuffix}`)) {
     const matches = folderNameWithSuffix.match(/^(.*?)(_([0-9]+))?$/);
     const existingNumber = parseInt(matches[3]) || 0;
+
+    // Increment the suffix number and update folder name
     suffix = `_${existingNumber + 1}`;
     folderNameWithSuffix = `${matches[1]}${suffix}`;
   }
 
+  // Create the new folder
   fs2.mkdirSync(`${destination}/${folderNameWithSuffix}`);
+
+  // Return the path of the newly created local folder
   return `${destination}/${folderNameWithSuffix}`;
 }
 
-// untested, NEED TO TEST
+
+// WORKS
+/**
+ * Download files from a specified folder by name.
+ *
+ * @param {object} mega - The Mega instance for performing operations.
+ * @param {string} targetFolderName - The name of the target folder.
+ * @param {string} downloadDestination - The local directory where files will be downloaded.
+ * @param {object} rootFolder - The root folder to begin the search (optional).
+ */
 async function folderByName(
   mega,
   targetFolderName,
   downloadDestination,
   rootFolder
 ) {
-  // only reload after making changes to the mega not through the code
+  // Only reload after making changes to the Mega instance, not through the code
   // await mega.reload();
 
   try {
     // Get the root folder
     rootFolder = rootFolder || mega?.root;
 
-    // Call the function to start the search process and find the files by name
+    // Call the function to start the search process and find the folders by name
     let foundData = await get.folderByName(rootFolder, targetFolderName);
-    
 
+    // Iterate through the found folders and download their contents
     for (const folder of foundData || []) {
+      // Create a local folder for downloading
       downloadDestination = makeLocalFolder(downloadDestination, folder.name);
+      
+      // Download contents of the folder
       await folderContent(folder.file, downloadDestination, mega);
     }
+
     if (foundData.length > 0) {
-      console.log("All folders downloaded and saved successfully!"); 
-    } else{
+      console.log("All folders downloaded and saved successfully!");
+    } else {
       console.log("No folders found with that name");
     }
-  
-
-    
   } catch (error) {
     console.error("Error:", error);
-  } 
-
+  }
 }
 
+
 // DOES NOT WORK
-// async function byNodeId(nodeId, downloadDestination, mega) {
-//   const foundData = await get.byNodeId(nodeId, mega)
+/**
+ * Download folders/files from Mega by their node IDs.
+ *
+ * @param {string} nodeId - The unique node ID of the folder/file.
+ * @param {string} downloadDestination - The local directory where folders/files will be downloaded.
+ * @param {object} mega - The Mega instance for performing operations.
+ */
+/**
+async function byNodeId(nodeId, downloadDestination, mega) {
+  // Get data from Mega using the specified node ID
+  const foundData = await get.byNodeId(nodeId, mega);
 
-//   // Start the download
-//   // Calculate total space needed for all the data in the foundData array
-//   const totalSpaceNeeded = await getTotalSpaceNeeded(foundData);
+  // Start the download process
+  // Calculate total space needed for all the data in the foundData array
+  const totalSpaceNeeded = await getTotalSpaceNeeded(foundData);
 
-//   // Check storage space before downloading
-//   const isEnoughSpace = checkStorageSpace(
-//     totalSpaceNeeded,
-//     downloadDestination
-//   );
+  // Check available storage space before downloading
+  const isEnoughSpace = checkStorageSpace(totalSpaceNeeded, downloadDestination);
 
-//   if (!isEnoughSpace) {
-//     console.log("Free Up Storage On Device To Download Media");
-//     return;
-//   }
+  if (!isEnoughSpace) {
+    console.log("Free Up Storage On Device To Download Media");
+    return;
+  }
 
-//   // Download and save the data to the download folder
-//   for (let i = 0; i < foundData.length; i++) {
-//     const filePath =
-//       i === 0
-//         ? `${downloadDestination}/${targetFolderName}`
-//         : `${downloadDestination}/${targetFolderName}_${i}`;
-//     saveFolderWithUniqueName(filePath, foundData[i], 0);
-//   }
-//   return console.log("All folders downloaded and saved successfully!");
-// }
+  // Download and save the data to the download folder
+  for (let i = 0; i < foundData.length; i++) {
+    const filePath =
+      i === 0
+        ? `${downloadDestination}/${foundData[i].targetFolderName}`
+        : `${downloadDestination}/${foundData[i].targetFolderName}_${i}`;
+    saveFolderWithUniqueName(filePath, foundData[i], 0);
+  }
+  return console.log("All folders downloaded and saved successfully!");
+}
+*/
+
+
 
 // WORKS
 /**
@@ -412,7 +441,7 @@ async function folderContent(folder, downloadDestination, mega) {
 module.exports = {
   fileByName,
   folderByName,
-  //byNodeId,
+  // byNodeId, // Disabled for now
   byURL,
   folderContent,
 };

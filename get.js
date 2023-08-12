@@ -3,6 +3,13 @@ const { File } = require("megajs");
 
 const MAX_RETRIES = 3;
 
+/**
+ * Retry the execution of a function for a maximum number of attempts.
+ *
+ * @param {Function} func - The function to retry.
+ * @param {number} maxAttempts - The maximum number of attempts to retry the function.
+ * @throws {Error} Throws the last error if all attempts fail.
+ */
 async function retryWithMaxAttempts(func, maxAttempts) {
   let attempts = 0;
   let lastError = null;
@@ -22,6 +29,7 @@ async function retryWithMaxAttempts(func, maxAttempts) {
 
   throw lastError; // Throw the last error if all attempts failed
 }
+
 
 
 /**
@@ -244,31 +252,53 @@ async function folderByDirPath(
   return exploreDirectory(rootFolder, folderNames, exploredFolders);
 }
 
+/**
+ * Retrieves file information and content from a provided URL and creates an object containing relevant file details.
+ *
+ * @param {string} url - The URL of the file.
+ * @returns {Object} An object containing file information and content.
+ */
 async function byURL(url) {
-  // Get the file object from the URL
+  // Get the file object from the provided URL
   const file = File.fromURL(url);
 
   // Load file attributes
   await file.loadAttributes();
 
-  // Then finally download the file like usual
-  const data = {
-    file,
-    link: url,
-    buffer: await file.downloadBuffer(),
-    name: file.name,
-    basename: path.parse(file.name).name,
-    ext: path.parse(file.name).ext,
-    nodeId: file.nodeId,
-    type: `${file.directory ? "Folder" : "File"}`,
+  // Download the file content
+  const buffer = await file.downloadBuffer();
+
+  // Prepare and return the file information object
+  const fileInfo = {
+    file, // The File object representing the downloaded file
+    link: url, // The URL of the file
+    buffer, // The file content as a buffer
+    name: file.name, // The name of the file
+    basename: path.parse(file.name).name, // The base name of the file (without extension)
+    ext: path.parse(file.name).ext, // The file extension
+    nodeId: file.nodeId, // The node ID of the file
+    type: `${file.directory ? "Folder" : "File"}`, // The type of the file (Folder or File)
   };
-return data;
+
+  // Return the file information object
+  return fileInfo;
 }
 
+
+
+/**
+ * Recursively explores a folder by its node ID and retrieves files matching the target node ID.
+ *
+ * @param {File} folder - The folder to explore.
+ * @param {string} targetNodeId - The target node ID to search for.
+ * @param {Set} [exploredFolders=new Set()] - A set to track explored folders and avoid infinite loops.
+ * @returns {Array} An array of data objects containing file information and content.
+ */
 async function exploreFolderByNodeId(folder, targetNodeId, exploredFolders = new Set()) {
   const folderUniqueID = folder.nodeId;
   const foundData = [];
 
+  // Avoid re-exploring folders already visited
   if (
     exploredFolders.has(folderUniqueID) &&
     folderUniqueID !== Array.from(exploredFolders)[0]
@@ -277,43 +307,41 @@ async function exploreFolderByNodeId(folder, targetNodeId, exploredFolders = new
   }
 
   try {
-
-      const matchingFiles = [];
-      for (const file of folder?.children || []) {
-        if (file?.nodeId && file.nodeId === targetNodeId) {
-          matchingFiles.push(file);
-        }
+    const matchingFiles = [];
+    for (const file of folder?.children || []) {
+      if (file?.nodeId && file.nodeId === targetNodeId) {
+        matchingFiles.push(file);
       }
+    }
 
-      if (matchingFiles && matchingFiles.length > 0) {
-        for (const file of matchingFiles) {
-          // Create data object for found file
-          const data = {
-            file,
-            link: file?.shareURL || (async () => {
+    if (matchingFiles && matchingFiles.length > 0) {
+      for (const file of matchingFiles) {
+        // Create data object for found file
+        const data = {
+          file,
+          link: file?.shareURL || (async () => {
+            try {
+              await file?.link();
+            } catch (error) {
               try {
-                await file?.link();
+                if (file.directory) {
+                  await file?.shareFolder();
+                }
               } catch (error) {
-                try {
-                  if (file.directory) {
-                    await file?.shareFolder();
-                  }
-                } catch (error) {
-                  if (error.message === "Error while matching files") {
-                    return null;
-                  }
+                if (error.message === "Error while matching files") {
+                  return null;
                 }
               }
-            }),
-            buffer: file.directory === "False" ? await file.downloadBuffer() : null,
-            name: file.name,
-            nodeId: file.nodeId,
-            type: `${file.directory ? "Folder" : "File"}`,
-          };
-          foundData.push(data);
-        }
+            }
+          }),
+          buffer: file.directory === "False" ? await file.downloadBuffer() : null,
+          name: file.name,
+          nodeId: file.nodeId,
+          type: `${file.directory ? "Folder" : "File"}`,
+        };
+        foundData.push(data);
       }
-    
+    }
   } catch (finalError) {
     console.error("All attempts failed:", finalError);
   }
@@ -345,10 +373,20 @@ async function exploreFolderByNodeId(folder, targetNodeId, exploredFolders = new
   return foundData;
 }
 
-async function byNodeId(nodeId, mega){
+
+/**
+ * Retrieves data for a file or folder by its node ID.
+ *
+ * @param {string} nodeId - The node ID of the file or folder to retrieve data for.
+ * @param {Mega} mega - The Mega instance to use for retrieval.
+ * @returns {Array} An array of data objects containing file information and content.
+ */
+async function byNodeId(nodeId, mega) {
+  // Retrieve data for a file or folder by its node ID
   const foundData = await exploreFolderByNodeId(mega.root, nodeId);
   return foundData;
-  }
+}
+
 
 module.exports = {
   fileByName,
