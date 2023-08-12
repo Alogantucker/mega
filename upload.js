@@ -1,9 +1,9 @@
 const fs = require('fs').promises;
 const path = require('path');
-const { Readable } = require('stream'); // Add this import for the Readable class
+const { Readable } = require('stream'); 
 const get = require("./get.js");
 
-
+// WORKS
 /**
  * Upload a file to a specific folder in Mega.
  *
