@@ -443,4 +443,5 @@ module.exports = {
   // byNodeId, // Disabled for now
   byURL,
   folderContent,
+  saveFileWithUniqueName
 };
